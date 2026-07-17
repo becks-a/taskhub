@@ -10,5 +10,6 @@ WORKDIR /app
 COPY --from=build /app/dist ./dist
 COPY --from=build /app/package*.json ./
 RUN npm install --omit=dev
+USER node
 EXPOSE 3001
 CMD ["node", "dist/main"]
