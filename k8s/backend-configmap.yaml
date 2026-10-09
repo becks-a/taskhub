@@ -1,0 +1,8 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: backend-config
+  namespace: taskhub
+data:
+  MONGODB_URI: "mongodb://mongodb:27017/kybern-taskhub"
+  PORT: "3001"
