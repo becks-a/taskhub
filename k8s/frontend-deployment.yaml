@@ -1,4 +1,3 @@
-
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -16,8 +15,8 @@ spec:
     spec:
       containers:
         - name: frontend
-          image: taskhub-frontend:dev
-          imagePullPolicy: Never
+          image: 409369915538.dkr.ecr.us-east-1.amazonaws.com/taskhub-frontend:latest
+          imagePullPolicy: IfNotPresent
           ports:
             - containerPort: 3000
           readinessProbe:

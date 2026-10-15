@@ -46,3 +46,15 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+# Terraform
+.terraform/
+
+
+# Terraform local state and generated files
+*.tfstate
+*.tfstate.*
+*.tfplan
+crash.log
+crash.*.log
+terraform/terraform.tfvars
+terraform/*.auto.tfvars
