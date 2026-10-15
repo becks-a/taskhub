@@ -14,7 +14,7 @@ resource "aws_eks_cluster" "main" {
 
     endpoint_private_access = true
     endpoint_public_access  = true
-    public_access_cidrs     = ["105.127.15.72/32"]
+    public_access_cidrs     = ["0.0.0.0/0"]
   }
 
   tags = {
