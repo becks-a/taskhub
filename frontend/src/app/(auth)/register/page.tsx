@@ -3,24 +3,28 @@
 import { Form, Input, Button, Card, Typography, App } from 'antd';
 import { UserOutlined, LockOutlined } from '@ant-design/icons';
 import { useAuth } from '../../../context/AuthContext';
-import { useRouter } from 'next/navigation';
 import api from '../../../lib/api';
 import Link from 'next/link';
 
 const { Title, Text } = Typography;
 
+type FormValues = { firstName: string; lastName: string; email: string; password: string };
+interface AuthResponse {
+  user: import('../../../context/AuthContext').User;
+  accessToken: string;
+}
+
 export default function Register() {
   const { login } = useAuth();
-  const router = useRouter();
   const { message } = App.useApp();
 
-  const onFinish = async (values: any) => {
+  const onFinish = async (values: FormValues) => {
     try {
-      const response: any = await api.post('/auth/register', values);
+      const response = await api.post<FormValues, AuthResponse>('/auth/register', values);
       login(response.user, response.accessToken);
       message.success('Registered successfully');
-    } catch (error: any) {
-      message.error(error.message || 'Registration failed');
+    } catch (error: unknown) {
+      message.error((error instanceof Error ? error.message : '') || 'Registration failed');
     }
   };
 

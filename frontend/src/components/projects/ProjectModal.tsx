@@ -4,6 +4,10 @@ import { Modal, Form, Input, ColorPicker } from 'antd';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useEffect } from 'react';
 import api from '../../lib/api';
+import type { Color } from 'antd/es/color-picker';
+
+type Project = { id: string; title: string; description?: string; color?: string };
+type ProjectValues = { title: string; description?: string; color?: string | Color };
 
 export function ProjectModal({ 
   isOpen, 
@@ -12,7 +16,7 @@ export function ProjectModal({
 }: { 
   isOpen: boolean; 
   onClose: () => void; 
-  project: any | null 
+  project: Project | null 
 }) {
   const [form] = Form.useForm();
   const queryClient = useQueryClient();
@@ -33,7 +37,7 @@ export function ProjectModal({
   }, [isOpen, project, form]);
 
   const saveMutation = useMutation({
-    mutationFn: (values: any) => {
+    mutationFn: (values: ProjectValues) => {
       // ColorPicker returns an object or string, so ensure it's a string
       const payload = {
         ...values,

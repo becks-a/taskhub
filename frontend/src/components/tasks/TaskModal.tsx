@@ -4,7 +4,14 @@ import { Modal, Form, Input, Select, DatePicker, App } from 'antd';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useEffect } from 'react';
 import api from '../../lib/api';
-import dayjs from 'dayjs';
+import dayjs, { type Dayjs } from 'dayjs';
+import type { Task } from './taskTypes';
+
+type ProjectOption = { id: string; title: string };
+type TaskValues = {
+  title: string; description?: string; project: string; status: string;
+  priority: string; dueDate?: Dayjs;
+};
 
 const { Option } = Select;
 
@@ -15,7 +22,7 @@ export function TaskModal({
 }: { 
   isOpen: boolean; 
   onClose: () => void; 
-  task: any | null 
+  task: Task | null 
 }) {
   const [form] = Form.useForm();
   const queryClient = useQueryClient();
@@ -23,7 +30,7 @@ export function TaskModal({
 
   const { data: projects, isLoading: projectsLoading } = useQuery({
     queryKey: ['projects'],
-    queryFn: () => api.get('/projects'),
+    queryFn: () => api.get<ProjectOption[]>('/projects'),
   });
 
   useEffect(() => {
@@ -48,7 +55,7 @@ export function TaskModal({
   }, [isOpen, task, form]);
 
   const saveMutation = useMutation({
-    mutationFn: (values: any) => {
+    mutationFn: (values: TaskValues) => {
       const payload = {
         ...values,
         dueDate: values.dueDate ? values.dueDate.toISOString() : undefined,
@@ -64,7 +71,7 @@ export function TaskModal({
       queryClient.invalidateQueries({ queryKey: ['tasks'] });
       onClose();
     },
-    onError: (error: any) => {
+    onError: (error: Error) => {
       message.error(error.message || 'Failed to save task');
     }
   });
@@ -103,7 +110,7 @@ export function TaskModal({
           rules={[{ required: true, message: 'Please select a project!' }]}
         >
           <Select placeholder="Select a project" loading={projectsLoading}>
-            {projects?.map((p: any) => (
+            {projects?.map((p: ProjectOption) => (
               <Option key={p.id} value={p.id}>{p.title}</Option>
             ))}
           </Select>

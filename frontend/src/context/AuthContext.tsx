@@ -39,12 +39,18 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     const storedUser = localStorage.getItem('user');
     const storedToken = localStorage.getItem('token');
 
-    if (storedUser && storedToken) {
-      setUser(JSON.parse(storedUser));
-      setToken(storedToken);
-    }
-    
-    setLoading(false);
+    queueMicrotask(() => {
+      if (storedUser && storedToken) {
+        try {
+          setUser(JSON.parse(storedUser) as User);
+          setToken(storedToken);
+        } catch {
+          localStorage.removeItem('user');
+          localStorage.removeItem('token');
+        }
+      }
+      setLoading(false);
+    });
   }, []);
 
   useEffect(() => {
