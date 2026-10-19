@@ -1,0 +1,33 @@
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: taskhub-monitor
+  namespace: taskhub
+spec:
+  schedule: "*/5 * * * *"
+  concurrencyPolicy: Forbid
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 3
+  jobTemplate:
+    spec:
+      backoffLimit: 0
+      activeDeadlineSeconds: 120
+      template:
+        spec:
+          restartPolicy: Never
+          containers:
+            - name: monitor
+              image: 409369915538.dkr.ecr.us-east-1.amazonaws.com/taskhub-monitor:v1
+              imagePullPolicy: IfNotPresent
+              env:
+                - name: FRONTEND_URL
+                  value: "http://frontend:3000/"
+                - name: BACKEND_URL
+                  value: "http://backend:3001/api"
+              resources:
+                requests:
+                  cpu: "25m"
+                  memory: "32Mi"
+                limits:
+                  cpu: "100m"
+                  memory: "128Mi"
