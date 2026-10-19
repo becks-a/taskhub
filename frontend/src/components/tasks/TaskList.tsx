@@ -3,14 +3,16 @@
 import { Table, Tag, Space, Button, Popconfirm, App } from 'antd';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import api from '../../lib/api';
+import type { Task } from './taskTypes';
+import type { TableColumnsType } from 'antd';
 
-export function TaskList({ onEditTask }: { onEditTask: (task: any) => void }) {
+export function TaskList({ onEditTask }: { onEditTask: (task: Task) => void }) {
   const queryClient = useQueryClient();
   const { message } = App.useApp();
 
   const { data: tasks, isLoading } = useQuery({
     queryKey: ['tasks'],
-    queryFn: () => api.get('/tasks'),
+    queryFn: () => api.get<Task[]>('/tasks'),
   });
 
   const deleteMutation = useMutation({
@@ -19,12 +21,12 @@ export function TaskList({ onEditTask }: { onEditTask: (task: any) => void }) {
       message.success('Task deleted successfully');
       queryClient.invalidateQueries({ queryKey: ['tasks'] });
     },
-    onError: (error: any) => {
+    onError: (error: Error) => {
       message.error(error.message || 'Failed to delete task');
     }
   });
 
-  const columns = [
+  const columns: TableColumnsType<Task> = [
     {
       title: 'Task Name',
       dataIndex: 'title',
@@ -65,7 +67,7 @@ export function TaskList({ onEditTask }: { onEditTask: (task: any) => void }) {
     {
       title: 'Actions',
       key: 'actions',
-      render: (_: any, record: any) => (
+      render: (_: unknown, record: Task) => (
         <Space size="middle">
           <Button type="link" size="small" onClick={() => onEditTask(record)}>Edit</Button>
           <Popconfirm

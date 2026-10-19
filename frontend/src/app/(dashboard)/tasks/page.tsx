@@ -6,14 +6,15 @@ import { useState } from 'react';
 import { TaskList } from '../../../components/tasks/TaskList';
 import { KanbanBoard } from '../../../components/tasks/KanbanBoard';
 import { TaskModal } from '../../../components/tasks/TaskModal';
+import type { Task } from '../../../components/tasks/taskTypes';
 
 const { Title } = Typography;
 
 export default function TasksPage() {
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const [editingTask, setEditingTask] = useState<any>(null);
+  const [editingTask, setEditingTask] = useState<Task | null>(null);
 
-  const openModal = (task: any = null) => {
+  const openModal = (task: Task | null = null) => {
     setEditingTask(task);
     setIsModalOpen(true);
   };

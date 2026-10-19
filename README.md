@@ -1,58 +1,223 @@
-# Kybern TaskHub
+# Kybern TaskHub — End-to-End DevOps Capstone
 
-Kybern TaskHub is a modern, production-quality Project Management application designed as a training environment for DevOps engineers. This repository contains the raw application code, and is intended to simulate a project that has been handed over by a development team.
+A full-stack project management application deployed to **Amazon EKS** using Docker, Terraform, Kubernetes, Amazon ECR, GitHub Actions, and Kubernetes Metrics Server.
 
-**Note:** This repository deliberately omits all deployment configuration, containerization artifacts (Dockerfiles, compose files), and CI/CD pipelines.
+This repository began as application source code and was extended with containerization, infrastructure as code, Kubernetes manifests, and an automated CI/CD pipeline.
 
-## Features
+## Application stack
 
-- **Project & Task Management**: Create, assign, edit, and organize tasks within projects.
-- **Kanban Board**: Drag-and-drop Trello-style board for visual task tracking.
-- **User Authentication**: Secure JWT-based authentication.
-- **Dashboards**: At-a-glance metrics, upcoming deadlines, and recent activity.
-- **Global Search**: Search across projects, tasks, and users.
-- **Responsive UI**: Modern interface with light/dark theme toggle, built with Ant Design.
+| Component | Technology |
+|---|---|
+| Frontend | Next.js 16, React 19, TypeScript |
+| Backend | NestJS, Node.js, TypeScript |
+| Database | MongoDB 8 |
+| Local containers | Docker and Docker Compose |
+| Infrastructure as code | Terraform |
+| Cloud infrastructure | AWS VPC, subnets, IAM, EKS, EBS, ALB |
+| Container registry | Amazon ECR |
+| CI/CD | GitHub Actions with AWS OIDC |
+| Resource monitoring | Kubernetes Metrics Server |
 
-## Tech Stack
+## Architecture
 
-### Frontend
-- Next.js 15+ (App Router)
-- React 19
-- TypeScript
-- Ant Design
-- React Query (TanStack Query)
-- Axios
-
-### Backend
-- NestJS
-- TypeScript
-- MongoDB (Mongoose)
-- JWT Authentication
-- Class Validator
-- Swagger (OpenAPI)
-
-## Folder Structure
-
+```text
+Browser
+  |
+  v
+AWS Application Load Balancer (HTTP :80)
+  |
+  v
+Kubernetes ALB Ingress
+  |
+  v
+Next.js frontend Service (:3000) -> frontend Deployment
+  |                                      |
+  +-- /api rewrite ---------------------+
+  |
+  v
+NestJS backend Service (:3001) -> backend Deployment
+  |
+  v
+MongoDB Service (:27017) -> MongoDB StatefulSet
+                               |
+                               v
+                     EBS-backed persistent volume
 ```
-kybern-taskhub/
-├── backend/          # NestJS REST API source code
-├── frontend/         # Next.js App Router source code
-├── docs/             # Project documentation (Architecture, API, Setup)
-├── README.md         # This file
-└── project.md        # Original project requirements
+
+The public ALB currently routes `/` to the frontend. Next.js forwards `/api` requests to the internal backend service. The backend handles authentication and application operations, including projects and tasks. MongoDB stores application data on persistent storage.
+
+### Delivery pipeline
+
+```text
+Push to GitHub feature/github-actions-cicd
+              |
+              v
+         GitHub Actions
+              |
+      +-------+-------+
+      |               |
+      v               v
+ Frontend checks   Backend checks
+ lint + build      unit tests + build
+      |               |
+      +-------+-------+
+              |
+              v
+       Deploy job (push only)
+              |
+        GitHub OIDC -> AWS IAM role
+              |
+        Docker builds -> Amazon ECR
+              |
+       Images tagged with commit SHA
+              |
+        kubectl set image on EKS
+              |
+        kubectl rollout status
 ```
 
-## Installation & Setup
+## Repository layout
 
-For detailed instructions on running this project locally, please refer to the documentation:
+```text
+taskhub/
+├── .github/workflows/ci.yml     # CI/CD workflow
+├── frontend/                    # Next.js application and Dockerfile
+├── backend/                     # NestJS API and Dockerfile
+├── docker-compose.yml           # Local multi-service environment
+├── k8s/                         # Deployments, Services, Ingress, PVC, StatefulSet
+├── terraform/                   # AWS infrastructure as code
+├── docs/                        # Original application documentation
+└── README.md
+```
 
-1. [Setup Guide](./docs/Setup.md)
-2. [Architecture Overview](./docs/Architecture.md)
-3. [API Documentation](./docs/API.md)
-4. [Detailed Folder Structure](./docs/FolderStructure.md)
+## 1. Containerization and local development
 
-## Contributing
-When contributing to the codebase, please ensure you follow the existing linting rules and run formatting before submitting PRs. Make sure not to introduce any deployment files as part of application feature work.
+The frontend and backend are packaged as Docker images using multi-stage builds. Their production images use a non-root runtime user. Docker Compose connects the frontend, backend, and MongoDB locally.
 
-## License
-MIT License
+```bash
+docker compose up -d --build
+docker compose ps
+```
+
+Frontend port: `3000`; backend port: `3001`; MongoDB port: `27017` (internal).
+
+## 2. Terraform and AWS infrastructure
+
+Terraform configuration provisions or configures the VPC, public/private subnets, routing, Internet Gateway, NAT Gateway, IAM roles, EKS cluster and node group, EBS CSI integration, and supporting AWS resources. AWS Load Balancer Controller IAM configuration is also included.
+
+```bash
+cd terraform
+terraform init
+terraform fmt -check
+terraform validate
+terraform plan
+```
+
+**Cost caution:** An EKS cluster, NAT Gateway, Application Load Balancer, and EC2 worker nodes can incur charges even when application traffic is low. Review AWS billing and clean up resources when no longer needed.
+
+**Security:** Never commit `terraform.tfstate`, state backups, `.terraform/`, credentials, or secret files. The Terraform state files in this working directory were verified as not tracked by Git on October 19, 2026.
+
+## 3. Kubernetes on EKS
+
+- **Cluster:** `taskhub-eks`
+- **Region:** `us-east-1`
+- **Namespace:** `taskhub`
+- **Frontend:** Kubernetes Deployment and ClusterIP Service on port `3000`
+- **Backend:** Kubernetes Deployment and ClusterIP Service on port `3001`
+- **MongoDB:** StatefulSet, ClusterIP Service on port `27017`, and EBS-backed PersistentVolumeClaim
+- **Public entry point:** AWS Application Load Balancer managed through Kubernetes Ingress
+
+Useful verification commands:
+
+```bash
+kubectl get nodes
+kubectl get deployments,pods,services -n taskhub
+kubectl get ingress,pvc -n taskhub
+kubectl describe deployment frontend -n taskhub
+```
+
+## 4. GitHub Actions CI/CD
+
+Workflow: `.github/workflows/ci.yml`.
+
+1. **Frontend job:** dependency installation, lint, and production build.
+2. **Backend job:** dependency installation, unit tests, and production build.
+3. **Deploy job:** runs after both checks succeed on pushes to `feature/github-actions-cicd`. It assumes a dedicated AWS IAM role using GitHub OIDC, builds and pushes both images to ECR tagged with the Git commit SHA, updates the Kubernetes Deployments, and waits for successful rollouts.
+
+OIDC avoids storing long-lived AWS access keys in GitHub. Kubernetes RBAC limits the deployment identity to updating the required frontend and backend Deployments in the `taskhub` namespace.
+
+**Branch limitation:** The deployment workflow is currently configured for the feature branch, not automatically for `main`. Moving deployment to `main` requires updating both the workflow condition and IAM trust policy.
+
+## 5. Monitoring and troubleshooting
+
+Kubernetes Metrics Server is installed in `kube-system`, and its Metrics API was verified available.
+
+```bash
+kubectl top nodes
+kubectl top pods -n taskhub
+kubectl logs deployment/frontend -n taskhub --tail=50
+kubectl logs deployment/backend -n taskhub --tail=50
+kubectl get events -n taskhub --sort-by=.metadata.creationTimestamp
+```
+
+Metrics Server provides current CPU and memory measurements; it does **not** provide long-term metric retention, application dashboards, or alerting. Prometheus/Grafana and automated alerts are potential future improvements.
+
+## 6. Testing and verification evidence
+
+The following results were observed on **October 19, 2026**:
+
+| Check | Observed result |
+|---|---|
+| Backend unit tests | 13 passing |
+| Frontend lint and production build | Passing |
+| GitHub Actions workflow | Frontend, backend, and deploy jobs succeeded |
+| EKS frontend Deployment | `1/1` Ready |
+| EKS backend Deployment | `1/1` Ready |
+| MongoDB pod | `1/1` Running |
+| Public homepage | HTTP `200` |
+| Unauthenticated `/api/projects` | HTTP `401`, expected for a protected endpoint |
+| Metrics Server Deployment | `1/1` Ready |
+| Metrics API | Available |
+| `kubectl top` | Node and application pod metrics returned |
+| Browser project workflow | Signed-in project listing and new project visible in screenshots |
+
+Both deployed images were tagged with commit:
+
+`2336d0591a88c64705dbb1fc0df0c9c1735f12c8`
+
+Public ALB endpoint at the time of verification:
+
+http://k8s-taskhub-taskhubf-bf65db50f2-1303020863.us-east-1.elb.amazonaws.com/
+
+This is an AWS-generated hostname and can change if the ALB is recreated. HTTPS is not yet configured.
+
+## 7. Challenges and resolutions
+
+**AWS worker node eligibility:** An earlier EC2 instance selection was rejected under account eligibility restrictions. Node configuration was adjusted and the cluster eventually reached a healthy state.
+
+**MongoDB persistent storage:** Configured the EBS CSI driver, storage class, and PVC, and verified volume provisioning.
+
+**GitHub OIDC trust failure:** The first deploy attempt failed with `sts:AssumeRoleWithWebIdentity`. CloudTrail revealed that the OIDC subject contained immutable repository and owner IDs. Updating the IAM trust policy to match the actual subject allowed the rerun to succeed.
+
+**Least-privilege deployment:** Configured an EKS `aws-auth` identity mapping and namespace-scoped Role/RoleBinding. Verified that deployment patching was allowed and deletion was denied.
+
+**Metrics API unavailable:** Installed Metrics Server, verified its pod was Ready, and confirmed `kubectl top` returned live readings.
+
+**Rolling deployment warning:** A readiness warning appeared for an old backend pod while it was being terminated. The replacement backend started successfully and remained Ready.
+
+## 8. Security considerations and next steps
+
+Implemented: non-root containers, multi-stage builds, IAM roles, OIDC for CI/CD, Kubernetes RBAC, internal ClusterIP services, and commit-SHA image tags.
+
+Before treating this as a production service, additional work is recommended: HTTPS with a custom domain and ACM certificate, secure application secret management, historical metrics and alerts, automated end-to-end tests, resource requests/limits review, and backup/recovery planning.
+
+## 9. Supporting application documentation
+
+- [Local setup](docs/Setup.md)
+- [Application architecture](docs/Architecture.md)
+- [API overview](docs/API.md)
+- [Folder structure](docs/FolderStructure.md)
+
+## Outcome
+
+This capstone demonstrates a functioning delivery path from source control to a publicly accessible Kubernetes application: GitHub Actions validates the code, builds and pushes immutable-versioned images to ECR, deploys them to EKS, and verifies rollouts. Kubernetes Metrics Server, logs, and events provide initial operational visibility.

@@ -1,12 +1,15 @@
 import axios, { AxiosInstance } from 'axios';
 
+/* eslint-disable @typescript-eslint/no-explicit-any -- Existing API defaults are relied on by untyped callers; migrate separately. */
 export interface CustomAxiosInstance extends Omit<AxiosInstance, 'get' | 'post' | 'put' | 'delete' | 'patch'> {
-  get<T = any, R = T, D = any>(url: string, config?: any): Promise<R>;
-  delete<T = any, R = T, D = any>(url: string, config?: any): Promise<R>;
+  get<T = any, R = T>(url: string, config?: any): Promise<R>;
+  delete<T = any, R = T>(url: string, config?: any): Promise<R>;
   post<T = any, R = T, D = any>(url: string, data?: D, config?: any): Promise<R>;
   put<T = any, R = T, D = any>(url: string, data?: D, config?: any): Promise<R>;
   patch<T = any, R = T, D = any>(url: string, data?: D, config?: any): Promise<R>;
 }
+
+/* eslint-enable @typescript-eslint/no-explicit-any */
 
 const api = axios.create({
   baseURL: '/api',

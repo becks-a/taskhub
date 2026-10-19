@@ -3,24 +3,28 @@
 import { Form, Input, Button, Card, Typography, App } from 'antd';
 import { UserOutlined, LockOutlined } from '@ant-design/icons';
 import { useAuth } from '../../../context/AuthContext';
-import { useRouter } from 'next/navigation';
 import api from '../../../lib/api';
 import Link from 'next/link';
 
 const { Title, Text } = Typography;
 
+type FormValues = { email: string; password: string };
+interface AuthResponse {
+  user: import('../../../context/AuthContext').User;
+  accessToken: string;
+}
+
 export default function Login() {
   const { login } = useAuth();
-  const router = useRouter();
   const { message } = App.useApp();
 
-  const onFinish = async (values: any) => {
+  const onFinish = async (values: FormValues) => {
     try {
-      const response: any = await api.post('/auth/login', values);
+      const response = await api.post<FormValues, AuthResponse>('/auth/login', values);
       login(response.user, response.accessToken);
       message.success('Logged in successfully');
-    } catch (error: any) {
-      message.error(error.message || 'Login failed');
+    } catch (error: unknown) {
+      message.error((error instanceof Error ? error.message : '') || 'Login failed');
     }
   };
 
@@ -48,7 +52,7 @@ export default function Login() {
           </Form.Item>
           
           <div style={{ textAlign: 'center' }}>
-            <Text>Don't have an account? <Link href="/register" style={{ color: '#5E6AD2' }}>Sign up</Link></Text>
+            <Text>Don&apos;t have an account? <Link href="/register" style={{ color: '#5E6AD2' }}>Sign up</Link></Text>
           </div>
         </Form>
       </Card>
