@@ -68,10 +68,11 @@ jobs:
 
       - name: Build backend
         run: npm run build
+
   deploy:
     name: Deploy to AWS EKS
     needs: [frontend, backend]
-    if: github.event_name == 'push' && github.ref == 'refs/heads/feature/github-actions-cicd'
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
 
     permissions:
