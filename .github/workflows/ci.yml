@@ -68,3 +68,72 @@ jobs:
 
       - name: Build backend
         run: npm run build
+  deploy:
+    name: Deploy to AWS EKS
+    needs: [frontend, backend]
+    if: github.event_name == 'push' && github.ref == 'refs/heads/feature/github-actions-cicd'
+    runs-on: ubuntu-latest
+
+    permissions:
+      contents: read
+      id-token: write
+
+    env:
+      AWS_REGION: us-east-1
+      AWS_ACCOUNT_ID: '409369915538'
+      EKS_CLUSTER: taskhub-eks
+      K8S_NAMESPACE: taskhub
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: arn:aws:iam::409369915538:role/taskhub-github-actions-role
+          aws-region: us-east-1
+
+      - name: Log in to Amazon ECR
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Build and push frontend image
+        run: |
+          IMAGE="$AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/taskhub-frontend"
+          docker build -t "$IMAGE:$GITHUB_SHA" ./frontend
+          docker push "$IMAGE:$GITHUB_SHA"
+
+      - name: Build and push backend image
+        run: |
+          IMAGE="$AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/taskhub-backend"
+          docker build -t "$IMAGE:$GITHUB_SHA" ./backend
+          docker push "$IMAGE:$GITHUB_SHA"
+
+      - name: Configure Kubernetes access
+        run: |
+          aws eks update-kubeconfig \
+            --name "$EKS_CLUSTER" \
+            --region "$AWS_REGION"
+
+      - name: Deploy frontend and backend
+        run: |
+          FRONTEND_IMAGE="$AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/taskhub-frontend:$GITHUB_SHA"
+          BACKEND_IMAGE="$AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/taskhub-backend:$GITHUB_SHA"
+
+          kubectl set image deployment/frontend \
+            frontend="$FRONTEND_IMAGE" \
+            -n "$K8S_NAMESPACE"
+
+          kubectl set image deployment/backend \
+            backend="$BACKEND_IMAGE" \
+            -n "$K8S_NAMESPACE"
+
+      - name: Verify deployment rollout
+        run: |
+          kubectl rollout status deployment/frontend \
+            -n "$K8S_NAMESPACE" --timeout=300s
+
+          kubectl rollout status deployment/backend \
+            -n "$K8S_NAMESPACE" --timeout=300s
+
+          kubectl get deployments -n "$K8S_NAMESPACE"
