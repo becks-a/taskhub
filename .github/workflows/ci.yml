@@ -81,7 +81,7 @@ jobs:
 
     env:
       AWS_REGION: us-east-1
-      AWS_ACCOUNT_ID: '409369915538'
+      AWS_ACCOUNT_ID: ${{ secrets.AWS_ACCOUNT_ID }}
       EKS_CLUSTER: taskhub-eks
       K8S_NAMESPACE: taskhub
 
@@ -92,7 +92,7 @@ jobs:
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:
-          role-to-assume: arn:aws:iam::409369915538:role/taskhub-github-actions-role
+          role-to-assume: arn:aws:iam::${{ secrets.AWS_ACCOUNT_ID }}:role/taskhub-github-actions-role
           aws-region: us-east-1
 
       - name: Log in to Amazon ECR
