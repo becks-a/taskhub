@@ -49,7 +49,7 @@ The public ALB currently routes `/` to the frontend. Next.js forwards `/api` req
 ### Delivery pipeline
 
 ```text
-Push to GitHub feature/github-actions-cicd
+Pull request checks / push to GitHub main
               |
               v
          GitHub Actions
@@ -142,11 +142,11 @@ Workflow: `.github/workflows/ci.yml`.
 
 1. **Frontend job:** dependency installation, lint, and production build.
 2. **Backend job:** dependency installation, unit tests, and production build.
-3. **Deploy job:** runs after both checks succeed on pushes to `feature/github-actions-cicd`. It assumes a dedicated AWS IAM role using GitHub OIDC, builds and pushes both images to ECR tagged with the Git commit SHA, updates the Kubernetes Deployments, and waits for successful rollouts.
+3. **Deploy job:** runs after both checks succeed on pushes to `main`. It assumes a dedicated AWS IAM role using GitHub OIDC, builds and pushes both images to ECR tagged with the Git commit SHA, updates the Kubernetes Deployments, and waits for successful rollouts.
 
 OIDC avoids storing long-lived AWS access keys in GitHub. Kubernetes RBAC limits the deployment identity to updating the required frontend and backend Deployments in the `taskhub` namespace.
 
-**Branch limitation:** The deployment workflow is currently configured for the feature branch, not automatically for `main`. Moving deployment to `main` requires updating both the workflow condition and IAM trust policy.
+**Deployment trigger:** Pull requests run CI checks. Pushes to `main` automatically deploy to Amazon EKS after the checks pass, using GitHub Actions and AWS OIDC authentication.
 
 ## 5. Monitoring and troubleshooting
 
@@ -161,6 +161,24 @@ kubectl get events -n taskhub --sort-by=.metadata.creationTimestamp
 ```
 
 Metrics Server provides current CPU and memory measurements; it does **not** provide long-term metric retention, application dashboards, or alerting. Prometheus/Grafana and automated alerts are potential future improvements.
+
+
+### Automated health monitoring and alerting
+
+TaskHub uses a Kubernetes CronJob to check application health every five minutes.
+
+- Bash checks the frontend and backend HTTP responses.
+- Python generates critical JSON alerts when a check fails.
+- Docker packages the monitoring scripts.
+- Amazon ECR stores the monitoring image.
+- Kubernetes runs the monitoring container automatically.
+
+Healthy checks exit successfully. Failed checks produce alerts in Kubernetes logs.
+
+Both successful and failed health checks were tested on October 19, 2026.
+Automatic monitoring was verified again on October 20, 2026.
+
+External alert notifications are not yet configured.
 
 ## 6. Testing and verification evidence
 
@@ -183,7 +201,7 @@ The following results were observed on **October 19, 2026**:
 
 Both deployed images were tagged with commit:
 
-`2336d0591a88c64705dbb1fc0df0c9c1735f12c8`
+`eb60b5ae618df219c541ccfdbce6665cdf8cd901`
 
 Public ALB endpoint at the time of verification:
 
